@@ -1,5 +1,9 @@
 {
     "conventionalCommits.scopes": [
-        "commands"
+        "commands",
+        "install-scripts",
+        "docs",
+        "build",
+        "tests",
     ]
 }
