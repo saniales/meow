@@ -35,8 +35,9 @@ buildFor() {
     os="$1"
     arch="$2"
 
+    real_meow_version=${meow_version}-${os}-${arch}
     GOOS=${os} GOARCH=${arch} go build \
-        -ldflags "-s -w -X 'github.com/saniales/meow-cli/cmd.cliVersion=${meow_version}'" \
+        -ldflags "-s -w -X 'github.com/saniales/meow-cli/cmd.cliVersion=${real_meow_version}'" \
         -o "./bin/meow-${os}-${arch}"
 }
 

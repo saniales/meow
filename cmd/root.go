@@ -27,6 +27,8 @@ import (
 
 var cfgFile string
 
+var cliVersion string = "0.0.0-unstable"
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "meow",
@@ -40,6 +42,16 @@ You can find more information at https://cheshirecat.ai and https://cheshire-cat
 
 You can use this paw-friendly CLI to manage the cat installs, call the API and more!`,
 	Example: "meow help",
+	Version: cliVersion,
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version number of meow",
+	Long:  `Print the version number of meow`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("meow version %s\n", cliVersion)
+	},
 }
 
 var installCmd = &cobra.Command{
@@ -65,6 +77,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(versionCmd)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.meow-cli.yaml)")
 
@@ -88,6 +101,7 @@ func initConfig() {
 		viper.SetConfigName(".meow-cli")
 	}
 
+	viper.SetEnvPrefix("CCAT")
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
