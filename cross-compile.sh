@@ -19,21 +19,38 @@
 go-bindata -nomemcopy -pkg bindata -o ./gen/bindata/bindata.go ./install-scripts/...
 
 # get latest slug from github actions env variable, or defaults to commit hash
-MEOW_VERSION=${GITHUB_REF_NAME:-$(git rev-parse HEAD)}
+if [ -z "$GITHUB_REF_NAME" ]; then
+    head_describe=$(git describe --tags)
+    meow_version=${GITHUB_REF_NAME:-${head_describe}}
+else
+    meow_version=${GITHUB_REF_NAME}
+fi
 
-OS_LIST=("linux" "windows")
-ARCH_LIST=("386" "amd64" "arm64")
+echo "Meow version: ${meow_version}"
 
-for OS in "${OS_LIST[@]}"; do
-    for ARCH in "${ARCH_LIST[@]}"; do
-        echo "Compiling for ${OS} ${ARCH}"
-        GOOS=${OS} GOARCH=${ARCH} go build -ldflags "-s -w" -o ./bin/meow-${OS}-${ARCH} .
+os_list=("linux" "windows")
+arch_list=("386" "amd64" "arm64")
+
+buildFor() {
+    os="$1"
+    arch="$2"
+
+    GOOS=${os} GOARCH=${arch} go build \
+        -ldflags "-s -w -X 'github.com/saniales/meow-cli/cmd.cliVersion=${meow_version}'" \
+        -o "./bin/meow-${os}-${arch}"
+}
+
+for os in "${os_list[@]}"; do
+    for arch in "${arch_list[@]}"; do
+        echo "Compiling for ${os} ${arch}"
+        buildFor "${os}" "${arch}"
     done
 done
 
 # Cross compile darwin executables
-ARCH_LIST=("amd64" "arm64")
-for ARCH in "${ARCH_LIST[@]}"; do
-    echo "Compiling for darwin ${ARCH}"
-    GOOS=${OS} GOARCH=${ARCH} go build -ldflags "-s -w" -o ./bin/meow-darwin-${ARCH} .
+os="darwin"
+arch_list=("amd64" "arm64")
+for arch in "${arch_list[@]}"; do
+    echo "Compiling for ${os} ${arch}"
+    buildFor "${os}" "${arch}"
 done 
