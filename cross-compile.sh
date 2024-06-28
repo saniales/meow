@@ -29,7 +29,7 @@ fi
 echo "Meow version: ${meow_version}"
 
 os_list=("linux" "windows")
-arch_list=("386" "amd64" "arm64")
+arch_list=("amd64")
 
 buildFor() {
     os="$1"
