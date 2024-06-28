@@ -14,15 +14,25 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
+
+// Package cmd represents the commands of the Meow CLI
 package cmd
 
 import (
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
 	"os"
+	"runtime"
+	"strings"
 
+	"github.com/cheggaaa/pb/v3"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/saniales/meow-cli/pkg/providers/install"
 )
 
 var cfgFile string
@@ -41,8 +51,16 @@ allows developing intelligent personal AI assistant agents on top of Large Langu
 You can find more information at https://cheshirecat.ai and https://cheshire-cat-ai.github.io/docs.
 
 You can use this paw-friendly CLI to manage the cat installs, call the API and more!`,
-	Example: "meow help",
-	Version: cliVersion,
+	Example:           "meow help",
+	Version:           cliVersion,
+	PersistentPreRunE: globalPreRunE,
+}
+
+var globalFlags struct {
+	configFile string
+	verbose    bool
+	quiet      bool
+	json       bool
 }
 
 var versionCmd = &cobra.Command{
@@ -58,11 +76,12 @@ var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Installs the cat and its dependencies on the current machine",
 	Long:  `Installs the cat and its dependencies on the current machine`,
-	RunE:  executeInstall,
+	Run:   executeInstall,
 }
 
 var installCmdFlags struct {
-	dryRun bool
+	reinstall bool
+	dryRun    bool
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -79,9 +98,14 @@ func init() {
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(versionCmd)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.meow-cli.yaml)")
+	// global flags
+	rootCmd.PersistentFlags().StringVar(&globalFlags.configFile, "config", "", "config file (default is $HOME/.meow-cli.yaml)")
+	rootCmd.PersistentFlags().BoolVarP(&globalFlags.verbose, "verbose", "v", false, "Enable verbose output (default is false) - Incompatible with --quiet")
+	rootCmd.PersistentFlags().BoolVarP(&globalFlags.quiet, "quiet", "q", false, "Enables output only on errors (default is false) - Incompatible with --verbose")
+	rootCmd.PersistentFlags().BoolVar(&globalFlags.json, "json", false, "Enables JSON formatted output (default is false)")
 
 	// install flags
+	installCmd.Flags().BoolVar(&installCmdFlags.reinstall, "reinstall", false, "Force install even if (default is false)")
 	installCmd.Flags().BoolVar(&installCmdFlags.dryRun, "dry-run", false, "Print only the install steps without performing them (default is false)")
 }
 
@@ -110,7 +134,114 @@ func initConfig() {
 	}
 }
 
+func globalPreRunE(cmd *cobra.Command, args []string) error {
+	// TODO: check for updates for the CLI from github releases
+
+	if globalFlags.verbose && globalFlags.quiet {
+		return errors.New("--verbose and --quiet flags are incompatible")
+	}
+
+	defaultLogHandlerOptions := new(slog.HandlerOptions)
+	if globalFlags.verbose {
+		defaultLogHandlerOptions.Level = slog.LevelDebug
+	} else if globalFlags.quiet {
+		defaultLogHandlerOptions.Level = slog.LevelError
+	} else {
+		defaultLogHandlerOptions.Level = slog.LevelInfo
+	}
+
+	var defaultLogHandler slog.Handler
+	if globalFlags.json {
+		defaultLogHandler = slog.NewJSONHandler(os.Stdout, defaultLogHandlerOptions)
+	} else {
+		defaultLogHandler = slog.NewTextHandler(os.Stdout, defaultLogHandlerOptions)
+	}
+	defaultLogger := slog.New(defaultLogHandler)
+	slog.SetDefault(defaultLogger)
+
+	return nil
+}
+
 // executeInstall performs the "install" logic.
-func executeInstall(cmd *cobra.Command, args []string) error {
-	return errors.New("command not yet implemented")
+func executeInstall(cmd *cobra.Command, args []string) {
+	downloadProgressFunc := progressbarFunc
+
+	httpClient := new(http.Client)
+	installer, err := install.NewInstallerWithProgressFunc(httpClient, downloadProgressFunc)
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+
+	switch runtime.GOOS {
+	case "linux":
+		slog.Info(
+			"Downloading and installing Docker Engine...",
+			slog.String("os", runtime.GOOS),
+			slog.String("arch", runtime.GOARCH),
+		)
+		err := installer.InstallDocker(install.InstallDockerConfig{
+			Verbose: globalFlags.verbose,
+		})
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+	case "darwin":
+	case "windows":
+		slog.Info(
+			"Downloading Docker Desktop installer...",
+			slog.String("os", runtime.GOOS),
+			slog.String("arch", runtime.GOARCH),
+		)
+		err := installer.DownloadDockerDesktopInstaller(install.DownloadDockerDesktopInstallerConfig{
+			ForceDownload: installCmdFlags.reinstall,
+		})
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+
+		slog.Info(
+			"Running Docker Desktop installer...",
+			slog.String("os", runtime.GOOS),
+			slog.String("arch", runtime.GOARCH),
+		)
+		err = installer.RunDockerDesktopInstaller(install.RunDockerDesktopInstallerConfig{
+			Verbose: globalFlags.verbose,
+		})
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+	}
+}
+
+func progressbarFunc(total int64, reader io.Reader) {
+	progressBar := pb.Full.Start64(total)
+	pbProxy := progressBar.NewProxyReader(reader)
+	io.Copy(io.Discard, pbProxy)
+	progressBar.Finish()
+}
+
+func ttyFunc(total int64, reader io.Reader) {
+	var totalRead int64
+	buffer := make([]byte, total/50)
+	start := 0
+	end := 50
+	for totalRead <= total {
+		n, _ := reader.Read(buffer)
+		percentage := float64(totalRead) / float64(total) * 100
+
+		progressTTY := strings.Repeat("#", start) + strings.Repeat(".", end)
+		progressMessage := fmt.Sprintf("%s - %d%% completed", progressTTY, int(percentage))
+		totalRead += int64(n)
+
+		fmt.Printf("\r%s", progressMessage)
+
+		start++
+		end--
+	}
+
+	fmt.Println(strings.Repeat("#", 50))
 }

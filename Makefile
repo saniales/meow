@@ -3,3 +3,6 @@ build: cmd/*
 
 cross-compile: cmd/* pkg/* main.go
 	./cross-compile.sh
+
+test:
+	go test -v -race -cover ./...
