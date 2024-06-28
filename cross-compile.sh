@@ -15,6 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+# Download bindata if not already downloaded
+go install -a -v github.com/go-bindata/go-bindata/...@latest
+
 # Generate bindata assets
 go-bindata -nomemcopy -pkg bindata -o ./gen/bindata/bindata.go ./install-scripts/...
 
@@ -34,11 +37,17 @@ arch_list=("amd64")
 buildFor() {
     os="$1"
     arch="$2"
+    extension=""
+
+    if [ "${os}" == "windows" ]; then
+        extension=".exe"
+    fi
 
     real_meow_version=${meow_version}-${os}-${arch}
     GOOS=${os} GOARCH=${arch} go build \
+        -trimpath \
         -ldflags "-s -w -X 'github.com/saniales/meow-cli/cmd.cliVersion=${real_meow_version}'" \
-        -o "./bin/meow-${os}-${arch}"
+        -o "./bin/meow-${os}-${arch}${extension}"
 }
 
 for os in "${os_list[@]}"; do

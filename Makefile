@@ -1,5 +1,5 @@
 build: cmd/*
-	go build -o meow
+	go build -trimpath -o meow
 
 cross-compile: cmd/* pkg/* main.go
 	./cross-compile.sh

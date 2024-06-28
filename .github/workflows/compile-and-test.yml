@@ -1,0 +1,29 @@
+name: Compile and Test
+
+on:
+    push:
+        branches:
+            - '**'
+    pull_request:
+    workflow_call:
+
+env:
+    GO111MODULE: on
+    GOPATH: /home/runner/go
+    GOBIN: /home/runner/go/bin
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: "^1.22.1"
+            - run: make cross-compile
+            - run: make test
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: binaries
+                  path: |
+                      bin
