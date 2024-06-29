@@ -203,6 +203,11 @@ func executeInstall(cmd *cobra.Command, args []string) {
 			slog.Error(err.Error())
 			os.Exit(1)
 		}
+		slog.Info(
+			"Docker Engine installed successfully",
+			slog.String("os", runtime.GOOS),
+			slog.String("arch", runtime.GOARCH),
+		)
 	case "darwin":
 	case "windows":
 		slog.Info(
@@ -217,6 +222,11 @@ func executeInstall(cmd *cobra.Command, args []string) {
 			slog.Error(err.Error())
 			os.Exit(1)
 		}
+		slog.Info(
+			"Docker Desktop installer downloaded successfully",
+			slog.String("os", runtime.GOOS),
+			slog.String("arch", runtime.GOARCH),
+		)
 
 		slog.Info(
 			"Running Docker Desktop installer...",
@@ -230,6 +240,11 @@ func executeInstall(cmd *cobra.Command, args []string) {
 			slog.Error(err.Error())
 			os.Exit(1)
 		}
+		slog.Info(
+			"Docker Desktop installed successfully",
+			slog.String("os", runtime.GOOS),
+			slog.String("arch", runtime.GOARCH),
+		)
 	}
 }
 
