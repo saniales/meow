@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strings"
 
 	"github.com/cheggaaa/pb/v3"
@@ -36,8 +37,6 @@ import (
 )
 
 var cfgFile string
-
-var cliVersion string = "0.0.0-unstable"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -52,7 +51,7 @@ You can find more information at https://cheshirecat.ai and https://cheshire-cat
 
 You can use this paw-friendly CLI to manage the cat installs, call the API and more!`,
 	Example:           "meow help",
-	Version:           cliVersion,
+	Version:           "(devel)",
 	PersistentPreRunE: globalPreRunE,
 }
 
@@ -68,7 +67,7 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version number of meow",
 	Long:  `Print the version number of meow`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("meow version %s\n", cliVersion)
+		fmt.Printf("meow version %s\n", rootCmd.Version)
 	},
 }
 
@@ -92,7 +91,24 @@ func Execute() {
 	}
 }
 
+func parseCLIVersion() {
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		// Get the version from the build info
+		for _, setting := range info.Settings {
+			if setting.Key == "github.com/saniales/meow-cli/cmd.cliVersion" {
+				rootCmd.Version = setting.Value
+				return
+			}
+		}
+	}
+
+	rootCmd.Version = info.Main.Version
+}
+
 func init() {
+	parseCLIVersion()
+
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.AddCommand(installCmd)
