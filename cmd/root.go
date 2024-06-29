@@ -181,6 +181,9 @@ func globalPreRunE(cmd *cobra.Command, args []string) error {
 // executeInstall performs the "install" logic.
 func executeInstall(cmd *cobra.Command, args []string) {
 	downloadProgressFunc := progressbarFunc
+	if globalFlags.json {
+		downloadProgressFunc = ttyFunc
+	}
 
 	httpClient := new(http.Client)
 	installer, err := install.NewInstallerWithProgressFunc(httpClient, downloadProgressFunc)
@@ -265,10 +268,10 @@ func ttyFunc(total int64, reader io.Reader) {
 		percentage := float64(totalRead) / float64(total) * 100
 
 		progressTTY := strings.Repeat("#", start) + strings.Repeat(".", end)
-		progressMessage := fmt.Sprintf("%s - %d%% completed", progressTTY, int(percentage))
+		progressMessage := fmt.Sprintf("%s - %d%% completed\n", progressTTY, int(percentage))
 		totalRead += int64(n)
 
-		fmt.Printf("\r%s", progressMessage)
+		slog.Info(progressMessage)
 
 		start++
 		end--
